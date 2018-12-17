@@ -1,0 +1,196 @@
+---
+title: "Simulations for postdoc secretary problem"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+Code for simulating one experient, where we reject $k_0$ out of $n$ and then accept the first, who is second-best:
+```{r}
+simulate <- function(n, k0){
+  lst <- sample(1:n, n)
+  first <- lst[1]
+  second <- 0
+  for(i in 2:k0){
+    if (lst[i] < first){
+      second <- first
+      first <- lst[i]
+    }else if(lst[i] < second){
+      second <- lst[i]
+    }
+  }
+  for(i in (k0+1):n){
+    if (lst[i] < first){
+      second <- first
+      first <- lst[i]
+    }else if(lst[i] < second){
+      if (lst[i] == 2){
+        return(1);
+      }else{
+        return(0);
+      }
+    }
+  }
+  return(0);
+}
+
+simulate_N_times<- function(N, n, k0){
+  result<- 0
+  for (i in 1:N){
+    result <- result + simulate(n, k0)
+  }
+  return (result/N)
+}
+```
+Run simulation $N$ times for different values of $n$(ranging from $50$ to $1000$ with the step $4$):
+```{r}
+N <- 700
+n_vect <- seq(50, 300, by=2)
+max_success <- c()
+argmax_success <- c()
+j <- 1
+for (n in n_vect){
+  success <- c()
+  for (k0 in 1:(n - 1)){
+    success[k0] <- 0
+    for (i in 1:N){
+      success[k0] <- success[k0] + simulate(n, k0)
+    }
+  }
+  max_success[j] <- max(success) / N
+  argmax_success[j] <- which.max(success)
+  j <- j + 1
+}
+```
+Plot the dependence of $n$ and the maximum probability for that $n$ and also at what value of $k_0$ maniizes the probability:
+```{r}
+plot(n_vect, max_success, type='l', xlab="n", ylab="Probability")
+```
+
+
+```{r}
+plot(n_vect, argmax_success, xlab="k0", ylab="Probability")
+lines(n_vect, n_vect / 2)
+```
+As we can see, maximum probability of success following optimal strategy is near $0.25$ (actually it is a little bigger on the graph, since our number of experiment is a finite number) and is achived by the value of $k_0$ that is close to $\frac{n}{2}$ as was suggested by theory.  
+
+
+Code for calculating success probability using derived formula:
+```{r}
+calculate <- function(n, k0){
+  return(k0 * (n - k0)/(n * (n - 1)))
+}
+```
+Calculate the difference between result of simulations and results from derived formula:
+```{r}
+n <- 100
+difference <- c()
+formula <- c()
+simulation <- c()
+for (k0 in 1:(n - 1)){
+  formula[k0] <- calculate(n, k0)
+  simulation[k0] <- simulate_N_times(1000, n, k0)
+  difference[k0] <- abs(formula[k0] - simulation[k0])
+}
+cat("Max difference for success relative frequencies and success probabilities is: ", max(difference), end="\n")
+plot(1:(n-1), formula, type='l')
+lines(1:(n-1), simulation)
+```
+Code for determining the value of $k_0$ that minimizes $E(R_n)$:
+```{r}
+simulate_rank <- function(n, k0){
+  rank <- 0
+  lst <- sample(1:n, n)
+  first <- lst[1]
+  second <- 0
+  for(i in 2:k0){
+    if (lst[i] < first){
+      second <- first
+      first <- lst[i]
+    }else if(lst[i] < second){
+      second <- lst[i]
+    }
+  }
+  for(i in (k0+1):n){
+    if (lst[i] < first){
+      second <- first
+      first <- lst[i]
+    }else if(lst[i] < second){
+      return (lst[i])
+    }
+  }
+  return(lst[length(lst)]);
+}
+
+M <- 1000
+N_values <- seq(50, 300, by=10)
+min_n = c()
+for (N in N_values){
+  results <- c()
+  for (k0 in 1:(N-1)){
+    rank = 0
+    for (m in 0:M){
+      rank <- rank + simulate_rank(N, k0)
+    }
+    results[k0] = rank/M
+  }
+  min_n <- c(min_n, which.min(results))
+}
+
+plot(N_values, min_n, xlab = "N - length of sequence", ylab="n - stop value for min E(R)")
+
+```
+Code for simulating secretary problem, when we can choose either first or second and it will count as a success:
+```{r}
+simulate <- function(n){
+  m1 = 0.347 * n
+  m2 <- 2/3 *n
+  rank <- 0
+  lst <- sample(1:n, n)
+  first <- lst[1]
+  second <- 0
+  for(i in 2:m1){
+    if (lst[i] < first){
+      second <- first
+      first <- lst[i]
+    }else if(lst[i] < second){
+      second <- lst[i]
+    }
+  }
+  for(i in (m1+1):m2){
+    if (lst[i] < first){
+      if ((lst[i]==1) | (lst[i]==2)){
+        return (1)
+      } else {
+        return (0)
+      }
+    } else if (lst[i]< second){
+      second <- lst[i]
+    }
+  }
+    for(i in (m2+1):n){
+    if (lst[i] < second){
+      if ((lst[i]==1) | (lst[i]==2)){
+        return (1)
+      } else {
+        return (0)
+      }
+    }
+  }
+  return (0);
+}
+
+N_values <- c(100, 500, 1000, 5000)
+M <- 1000
+
+success = 0
+for (n in N_values){
+  success = 0
+  for (m in 1:M){
+  success = success + simulate(n)
+}
+cat("Probability of success for n =", n, "is", success/M, '\n')
+}
+
+```
+
